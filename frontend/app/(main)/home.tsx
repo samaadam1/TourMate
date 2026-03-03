@@ -16,7 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Attraction } from '../../constants/types';
 
-const API_BASE = 'http://YOUR_LOCAL_IP:5000/api'; // 🔁 replace with your LAN IP (run ipconfig in terminal)
+const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:5000/api`;// 🔁 replace with your LAN IP (run ipconfig in terminal)
 
 // ── Star Rating ──────────────────────────────────────────────────────
 const StarRating: React.FC<{ rating: number }> = ({ rating }) => (
