@@ -1,12 +1,25 @@
-import express from 'express'; // Imports Express.js.
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import authRoutes from './routes/auth.js';
 
-const app = express() // Creates an Express application instance.
-const port =  process.env.PORT || 3000;
+dotenv.config();
 
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Routes
+app.use('/auth', authRoutes);
+
+// Health check
 app.get('/', (req, res) => {
-  res.send('Hello World!')
-}) // Defines a route (/) that returns Hello, World!.
+  res.json({ message: 'TourMate API is running' });
+});
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-}) // Starts the server on port 3000 and logs a confirmation message.
+  console.log(`Server running on port ${port}`);
+});
