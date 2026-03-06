@@ -15,4 +15,5 @@ export interface Attraction {
   latitude: number;
   longitude: number;
   is_featured: boolean;
+  opening_hours?: string;
 }

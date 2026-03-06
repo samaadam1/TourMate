@@ -21,7 +21,8 @@ export default function RootLayout() {
       <Stack.Screen name="(main)/plan" />
       <Stack.Screen name="(main)/pick-spots" /> 
       <Stack.Screen name="(main)/itinerary" /> 
-      <Stack.Screen name="(main)/city-intro" />       
+      <Stack.Screen name="(main)/city-intro" />  
+      <Stack.Screen name="(main)/tourmate-ai" />
     </Stack>
   
   );
