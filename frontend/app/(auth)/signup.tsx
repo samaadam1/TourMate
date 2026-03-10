@@ -35,19 +35,24 @@ export default function SignUp() {
     }
 
     try {
-      await api.post('/auth/register', { username, email, password });
+      const res = await api.post('/auth/register', { username, email, password });
+
       (router as any).push({
         pathname: '/(auth)/confirmation',
-        params: { username, email },
+        params: {
+          username,
+          email,
+          userId: res.data.id,
+          token: res.data.token,
+        },
       });
-    } catch (error) {
-      console.log(error);
-      alert('Sign up failed');
+    } catch (error: any) {
+      const message = error?.response?.data?.error || 'Sign up failed';
+      alert(message);
     }
   };
 
   return (
-    
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#fff' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -127,8 +132,6 @@ export default function SignUp() {
         <TouchableOpacity onPress={handleSignUp} style={styles.signupButton}>
           <Text style={styles.signupButtonText}>Continue</Text>
         </TouchableOpacity>
-
-        
 
         {/* Already have account */}
         <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
