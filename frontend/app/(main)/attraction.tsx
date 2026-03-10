@@ -8,7 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Attraction } from '../../constants/types';
 
 const { width, height } = Dimensions.get('window');
-const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:5000/api`; // 🔁 replace with your LAN IP
+const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:5000/api`; 
 const BOTTOM_SHEET_HEIGHT = 260;
 
 // ── Star Rating ──────────────────────────────────────────────────────

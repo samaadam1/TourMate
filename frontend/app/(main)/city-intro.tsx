@@ -6,6 +6,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useApp } from '../../constants/AppContext';
 
 const { width } = Dimensions.get('window');
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
@@ -107,6 +108,7 @@ const Stars: React.FC<{ count: number }> = ({ count }) => (
 // ── CITY INTRO / TRANSPORTATION SCREEN ───────────────────────────────
 export default function CityIntroScreen() {
   const router = useRouter();
+  const { t, convertPrice } = useApp();
   const params = useLocalSearchParams<{ city: string; planId: string; startDate: string; endDate: string; budget: string }>();
   const city = params.city ?? 'Hurghada';
   const planId = params.planId;
@@ -195,7 +197,7 @@ export default function CityIntroScreen() {
   const handleDetermineplan = () => {
     if (!selectedFlight) { alert('Please select a flight.'); return; }
     if (!selectedHotel) { alert('Please select a hotel.'); return; }
-    alert(`🎉 Your plan is confirmed!\n\nFlight: ${selectedFlight.airline} ${selectedFlight.flightNumber}\nHotel: ${selectedHotel.name}\nTotal: $${total}`);
+    alert(`🎉 Your plan is confirmed!\n\nFlight: ${selectedFlight.airline} ${selectedFlight.flightNumber}\nHotel: ${selectedHotel.name}\nTotal: ${convertPrice(total)}`);
   };
 
   const changeDeparture = (dep: typeof DEPARTURE_CITIES[0]) => {
@@ -212,7 +214,7 @@ export default function CityIntroScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Travel plan</Text>
+        <Text style={styles.headerTitle}>{t('plan')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -227,7 +229,7 @@ export default function CityIntroScreen() {
 
         {/* ── Departure selector ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Departure City</Text>
+          <Text style={styles.sectionTitle}>{t('whereTo')}</Text>
           <TouchableOpacity
             style={styles.departureSelector}
             onPress={() => setShowDepartureModal(true)}
@@ -244,7 +246,7 @@ export default function CityIntroScreen() {
         {/* ── Flights ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>✈️ Flights</Text>
+            <Text style={styles.sectionTitle}>✈️ {t('flights')}</Text>
             <Text style={styles.sectionSubtitle}>{selectedDeparture.code} → {CITY_AIRPORTS[city]?.code ?? 'HRG'}</Text>
           </View>
 
@@ -292,7 +294,7 @@ export default function CityIntroScreen() {
 
                 <View style={styles.flightBottom}>
                   <Text style={styles.flightPriceLabel}>Round trip</Text>
-                  <Text style={styles.flightPrice}>${flight.price * 2}</Text>
+                  <Text style={styles.flightPrice}>{convertPrice(flight.price * 2)}</Text>
                 </View>
 
                 {selectedFlight === flight && (
@@ -308,7 +310,7 @@ export default function CityIntroScreen() {
         {/* ── Hotels ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🏨 Hotels</Text>
+            <Text style={styles.sectionTitle}>🏨 {t('hotels')}</Text>
             <Text style={styles.sectionSubtitle}>{nights} nights</Text>
           </View>
 
@@ -330,10 +332,10 @@ export default function CityIntroScreen() {
                   <Stars count={hotel.stars} />
                   <Text style={styles.hotelRating}>⭐ {hotel.rating}</Text>
                   <View style={styles.hotelPriceRow}>
-                    <Text style={styles.hotelPrice}>${hotel.price_per_night}</Text>
+                    <Text style={styles.hotelPrice}>{convertPrice(hotel.price_per_night)}</Text>
                     <Text style={styles.hotelPriceNight}>/night</Text>
                   </View>
-                  <Text style={styles.hotelTotal}>Total: ${hotel.price_per_night * nights}</Text>
+                  <Text style={styles.hotelTotal}>{t('plan')}: {convertPrice(hotel.price_per_night * nights)}</Text>
                 </View>
                 {selectedHotel?.id === hotel.id && (
                   <View style={styles.selectedBadge}>
@@ -352,19 +354,19 @@ export default function CityIntroScreen() {
             {selectedFlight && (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>✈️ Flights (round trip)</Text>
-                <Text style={styles.summaryValue}>${flightTotal}</Text>
+                <Text style={styles.summaryValue}>{convertPrice(flightTotal)}</Text>
               </View>
             )}
             {selectedHotel && (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>🏨 Hotel ({nights} nights)</Text>
-                <Text style={styles.summaryValue}>${hotelTotal}</Text>
+                <Text style={styles.summaryValue}>{convertPrice(hotelTotal)}</Text>
               </View>
             )}
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
               <Text style={styles.summaryTotalLabel}>Total</Text>
-              <Text style={styles.summaryTotal}>${total}</Text>
+              <Text style={styles.summaryTotal}>{convertPrice(total)}</Text>
             </View>
           </View>
         )}
@@ -379,7 +381,7 @@ export default function CityIntroScreen() {
           onPress={handleDetermineplan}
           activeOpacity={0.85}
         >
-          <Text style={styles.determineBtnText}>Determine the plan</Text>
+          <Text style={styles.determineBtnText}>{t('plan')} ✓</Text>
         </TouchableOpacity>
       </View>
 

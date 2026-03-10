@@ -1,10 +1,11 @@
 // app/(main)/pick-spots.tsx
-import React, { useState, useEffect }  from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, FlatList, ActivityIndicator, SafeAreaView, Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useApp } from '../../constants/AppContext';
 
 const { width } = Dimensions.get('window');
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
@@ -40,7 +41,9 @@ const SpotCard: React.FC<{
   onAdd: (item: Spot) => void;
   onFavorite: (item: Spot) => void;
   onPress: (item: Spot) => void;
-}> = ({ item, isAdded, isFavorited, onAdd, onFavorite, onPress }) => (
+}> = ({ item, isAdded, isFavorited, onAdd, onFavorite, onPress }) => {
+  const { convertPrice } = useApp();
+  return (
   <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.9}>
     <Image source={{ uri: item.image_url }} style={styles.cardImage} />
 
@@ -70,7 +73,7 @@ const SpotCard: React.FC<{
     <View style={styles.cardInfo}>
       <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
       <View style={styles.cardMeta}>
-        <Text style={styles.cardPrice}>from ${item.price_from}</Text>
+        <Text style={styles.cardPrice}>from {convertPrice(item.price_from)}</Text>
         <View style={styles.cardRating}>
           <Text style={styles.cardRatingStar}>★</Text>
           <Text style={styles.cardRatingText}>{item.rating}</Text>
@@ -78,11 +81,13 @@ const SpotCard: React.FC<{
       </View>
     </View>
   </TouchableOpacity>
-);
+  );
+};
 
 // ── PICK SPOTS SCREEN ─────────────────────────────────────────────────
 export default function PickSpotsScreen() {
   const router = useRouter();
+  const { t, convertPrice } = useApp();
   const params = useLocalSearchParams<{
     city: string;
     startDate: string;
@@ -180,7 +185,7 @@ export default function PickSpotsScreen() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
         {/* ── Title ── */}
-        <Text style={styles.title}>Pick Your Spots</Text>
+        <Text style={styles.title}>{t('plan')}</Text>
 
         {/* ── Category tabs ── */}
         <ScrollView
@@ -265,8 +270,8 @@ export default function PickSpotsScreen() {
       {/* ── Bottom bar ── */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomBarLeft}>
-          <Text style={styles.bottomBarLabel}>Selected spots</Text>
-          <Text style={styles.bottomBarCount}>{addedSpots.length} spots added</Text>
+          <Text style={styles.bottomBarLabel}>{t('favorites')}</Text>
+          <Text style={styles.bottomBarCount}>{addedSpots.length} {t('plan')}</Text>
         </View>
         <TouchableOpacity
           style={[styles.nextBtn, addedSpots.length === 0 && styles.nextBtnDisabled]}

@@ -8,6 +8,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Attraction } from '../../constants/types';
+import { useApp } from '../../constants/AppContext';
 
 const { width, height } = Dimensions.get('window');
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
@@ -46,6 +47,7 @@ interface AttractionSheetProps {
 }
 
 const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, onClose, onRemove }) => {
+  const { t, convertPrice } = useApp();
   const slideAnim   = useRef(new Animated.Value(height)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [isFavorited, setIsFavorited] = useState(true);
@@ -162,27 +164,27 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
             <View style={styles.infoPill}>
               <Text style={styles.infoPillIcon}>💰</Text>
               <View>
-                <Text style={styles.infoPillLabel}>Price from</Text>
-                <Text style={styles.infoPillValue}>${attraction.price_from}</Text>
+                <Text style={styles.infoPillLabel}>{t('priceFrom')}</Text>
+                <Text style={styles.infoPillValue}>{convertPrice(attraction.price_from)}</Text>
               </View>
             </View>
             <View style={styles.infoPill}>
               <Text style={styles.infoPillIcon}>🕐</Text>
               <View>
-                <Text style={styles.infoPillLabel}>Hours</Text>
-                <Text style={styles.infoPillValue} numberOfLines={1}>{attraction.opening_hours ?? 'See website'}</Text>
+                <Text style={styles.infoPillLabel}>{t('hours')}</Text>
+                <Text style={styles.infoPillValue} numberOfLines={1}>{attraction.opening_hours ?? t('seeWebsite')}</Text>
               </View>
             </View>
             <View style={styles.infoPill}>
               <Text style={styles.infoPillIcon}>🏷️</Text>
               <View>
-                <Text style={styles.infoPillLabel}>Category</Text>
+                <Text style={styles.infoPillLabel}>{t('category')}</Text>
                 <Text style={styles.infoPillValue}>{attraction.category}</Text>
               </View>
             </View>
           </ScrollView>
 
-          <Text style={styles.sheetAboutTitle}>About</Text>
+          <Text style={styles.sheetAboutTitle}>{t('about')}</Text>
           <Text style={styles.sheetAboutText}>{attraction.description}</Text>
           <View style={{ height: 20 }} />
         </ScrollView>
@@ -191,11 +193,11 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
         <View style={styles.sheetActions}>
           <TouchableOpacity style={styles.sheetFavoritesBtn} onPress={toggleFavorite} activeOpacity={0.85}>
             <Text style={styles.sheetFavoritesBtnText}>
-              {isFavorited ? '♥ Saved' : '♡ Save'}
+              {isFavorited ? t('saved') : t('save')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.sheetPlanBtn} activeOpacity={0.85}>
-            <Text style={styles.sheetPlanBtnText}>🗺️ Add to Plan</Text>
+            <Text style={styles.sheetPlanBtnText}>{t('addToPlan')}</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -209,6 +211,7 @@ const FavoriteCard: React.FC<{
   onPress: (item: Attraction) => void;
 }> = ({ item, onPress }) => {
   const categoryColor = CATEGORY_COLORS[item.category] ?? '#E67E22';
+  const { convertPrice } = useApp();
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.92}>
       <Image source={{ uri: item.image_url }} style={styles.cardImage} resizeMode="cover" />
@@ -223,7 +226,7 @@ const FavoriteCard: React.FC<{
         </View>
         <View style={styles.cardFooter}>
           <StarRating rating={Number(item.rating)} />
-          <Text style={styles.cardPrice}>From ${item.price_from}</Text>
+          <Text style={styles.cardPrice}>From {convertPrice(item.price_from)}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -231,33 +234,37 @@ const FavoriteCard: React.FC<{
 };
 
 // ── Empty State ───────────────────────────────────────────────────────
-const EmptyState: React.FC<{ onExplore: () => void }> = ({ onExplore }) => (
+const EmptyState: React.FC<{ onExplore: () => void }> = ({ onExplore }) => {
+  const { t } = useApp();
+  return (
   <View style={styles.emptyContainer}>
     <Text style={styles.emptyEmoji}>🏛️</Text>
-    <Text style={styles.emptyTitle}>No favorites yet</Text>
-    <Text style={styles.emptySubtitle}>Start exploring Egyptian attractions and save the ones you love!</Text>
+    <Text style={styles.emptyTitle}>{t('noFavorites')}</Text>
+    <Text style={styles.emptySubtitle}>{t('noFavoritesMsg')}</Text>
     <TouchableOpacity style={styles.exploreBtn} onPress={onExplore} activeOpacity={0.85}>
-      <Text style={styles.exploreBtnText}>Explore Attractions</Text>
+      <Text style={styles.exploreBtnText}>{t('explore')}</Text>
     </TouchableOpacity>
   </View>
-);
+  );
+};
 
 // ── Bottom Tab ────────────────────────────────────────────────────────
 const BottomTab: React.FC<{ active: string }> = ({ active }) => {
   const router = useRouter();
+  const { t } = useApp();
   const tabs = [
-    { name: 'Home',      icon: '🏠', route: '/(main)/home' },
-    { name: 'Plan',      icon: '🗺️', route: '/(main)/plan' },
-    { name: 'Tour Mate', icon: '🧳', route: '/(main)/tourmate-ai' },
-    { name: 'Favorites', icon: '♡',  route: '/(main)/favorites' },
-    { name: 'View Map',  icon: '📍', route: '/(main)/map' },
+    { name: 'Home',      label: t('home'),      icon: '🏠', route: '/(main)/home' },
+    { name: 'Plan',      label: t('plan'),      icon: '🗺️', route: '/(main)/plan' },
+    { name: 'Tour Mate', label: 'TourMate',     icon: '🧳', route: '/(main)/tourmate-ai' },
+    { name: 'Favorites', label: t('favorites'), icon: '♡',  route: '/(main)/favorites' },
+    { name: 'View Map',  label: t('map'),       icon: '📍', route: '/(main)/map' },
   ];
   return (
     <View style={styles.bottomTab}>
       {tabs.map(tab => (
         <TouchableOpacity key={tab.name} style={styles.tabItem} onPress={() => { if (tab.name !== active) router.push(tab.route as any); }}>
           <Text style={styles.tabIcon}>{tab.icon}</Text>
-          <Text style={[styles.tabLabel, tab.name === active && styles.tabLabelActive]}>{tab.name}</Text>
+          <Text style={[styles.tabLabel, tab.name === active && styles.tabLabelActive]}>{(tab as any).label ?? tab.name}</Text>
           {tab.name === active && <View style={styles.tabDot} />}
         </TouchableOpacity>
       ))}
@@ -268,6 +275,7 @@ const BottomTab: React.FC<{ active: string }> = ({ active }) => {
 // ── FAVORITES SCREEN ──────────────────────────────────────────────────
 export default function FavoritesScreen() {
   const router = useRouter();
+  const { t } = useApp();
   const [favorites, setFavorites]               = useState<Attraction[]>([]);
   const [loading, setLoading]                   = useState(true);
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
@@ -306,7 +314,7 @@ export default function FavoritesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Favorites</Text>
+          <Text style={styles.headerTitle}>{t('favoritesTitle')}</Text>
           <Text style={styles.headerSubtitle}>
             {favorites.length > 0 ? `${favorites.length} saved place${favorites.length > 1 ? 's' : ''}` : 'Your saved places'}
           </Text>

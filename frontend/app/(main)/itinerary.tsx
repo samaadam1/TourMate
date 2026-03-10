@@ -6,6 +6,7 @@ import {
   Alert, Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useApp } from '../../constants/AppContext';
 
 const { width } = Dimensions.get('window');
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
@@ -153,6 +154,7 @@ const ActivityRow: React.FC<{
 // ── ITINERARY SCREEN ──────────────────────────────────────────────────
 export default function ItineraryScreen() {
   const router = useRouter();
+  const { t } = useApp();
   const params = useLocalSearchParams<{
     city: string;
     startDate: string;
@@ -316,7 +318,7 @@ export default function ItineraryScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add itinerary</Text>
+        <Text style={styles.headerTitle}>{t('plan')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -359,7 +361,7 @@ export default function ItineraryScreen() {
           style={styles.addActivityBtn}
           onPress={() => setShowAddModal(true)}
         >
-          <Text style={styles.addActivityText}>+ Add activity</Text>
+          <Text style={styles.addActivityText}>+ {t('plan')}</Text>
         </TouchableOpacity>
 
         {/* AI assistant bubble */}
@@ -389,7 +391,7 @@ export default function ItineraryScreen() {
         >
           {saving
             ? <ActivityIndicator color="#FFF" />
-            : <Text style={styles.nextBtnText}>Next step</Text>
+            : <Text style={styles.nextBtnText}>{t('plan')} →</Text>
           }
         </TouchableOpacity>
       </View>

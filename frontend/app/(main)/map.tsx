@@ -8,6 +8,7 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { useApp } from '../../constants/AppContext';
 
 const { width, height } = Dimensions.get('window');
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
@@ -163,6 +164,7 @@ const PointsToast: React.FC<{ visible: boolean; points: number }> = ({ visible, 
 // ── MAP SCREEN ────────────────────────────────────────────────────────
 export default function MapScreen() {
   const router = useRouter();
+  const { t } = useApp();
   const mapRef = useRef<MapView>(null);
 
   const [userLocation, setUserLocation]     = useState<RoutePoint | null>(null);
@@ -409,7 +411,7 @@ export default function MapScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#E67E22" />
-        <Text style={styles.loadingText}>Getting your location...</Text>
+        <Text style={styles.loadingText}>{t('map')}...</Text>
       </View>
     );
   }
@@ -478,7 +480,7 @@ export default function MapScreen() {
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search places in Egypt..."
+{...{placeholder: t('search')}}
               placeholderTextColor="#AAA"
               value={searchQuery}
               onChangeText={searchPlaces}

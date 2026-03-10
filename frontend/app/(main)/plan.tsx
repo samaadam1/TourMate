@@ -6,6 +6,7 @@ import {
   ActivityIndicator, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useApp } from '../../constants/AppContext';
 
 const { width } = Dimensions.get('window');
 
@@ -75,6 +76,7 @@ interface DayForecast {
 // ── PLAN SCREEN ───────────────────────────────────────────────────────
 export default function PlanScreen() {
   const router = useRouter();
+  const { t } = useApp();
 
   const [selectedCity, setSelectedCity] = useState(EGYPTIAN_CITIES[0]);
   const [showCityModal, setShowCityModal] = useState(false);
@@ -187,7 +189,7 @@ export default function PlanScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Plan</Text>
+        <Text style={styles.headerTitle}>{t('plan')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -209,8 +211,8 @@ export default function PlanScreen() {
         {/* ── 5-Day Weather Forecast ── */}
         <View style={styles.card}>
           <View style={styles.forecastHeader}>
-            <Text style={styles.cardTitle}>Weather in {selectedCity.name}</Text>
-            <Text style={styles.forecastSubtitle}>5-day forecast</Text>
+            <Text style={styles.cardTitle}>{t('weather')} — {selectedCity.name}</Text>
+            <Text style={styles.forecastSubtitle}>{t('forecast')}</Text>
           </View>
           {weatherLoading ? (
             <ActivityIndicator size="small" color="#E67E22" style={{ marginVertical: 10 }} />
@@ -237,7 +239,7 @@ export default function PlanScreen() {
 
         {/* ── Calendar ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Select dates</Text>
+          <Text style={styles.cardTitle}>{t('plan')}</Text>
           <View style={styles.monthRow}>
             <TouchableOpacity onPress={prevMonth} style={styles.monthArrowBtn}>
               <Text style={styles.monthArrow}>‹</Text>
@@ -259,9 +261,9 @@ export default function PlanScreen() {
                 style={[
                   styles.dayCell,
                   { width: CELL_SIZE, height: CELL_SIZE },
-                  day ? (isDaySelected(day) ? styles.dayCellSelected : null) : null,
-                  day ? (isDayInRange(day) ? styles.dayCellInRange : null) : null,
-                  day ? (isDayToday(day) && !isDaySelected(day) ? styles.dayCellToday : null) : null,
+                  day && isDaySelected(day) && styles.dayCellSelected,
+                  day && isDayInRange(day) && styles.dayCellInRange,
+                  day && isDayToday(day) && !isDaySelected(day) && styles.dayCellToday,
                 ]}
                 onPress={() => day && handleDayPress(day)}
                 disabled={!day}
@@ -269,8 +271,8 @@ export default function PlanScreen() {
               >
                 <Text style={[
                   styles.dayCellText,
-                  day ? (isDaySelected(day) ? styles.dayCellTextSelected : null) : null,
-                  day ? (isDayInRange(day) ? styles.dayCellTextRange : null) : null,
+                  day && isDaySelected(day) && styles.dayCellTextSelected,
+                  day && isDayInRange(day) && styles.dayCellTextRange,
                 ]}>
                   {day ?? ''}
                 </Text>
@@ -288,7 +290,7 @@ export default function PlanScreen() {
 
         {/* ── Budget ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Budget</Text>
+          <Text style={styles.cardTitle}>💰 Budget</Text>
           <View style={styles.budgetRow}>
             <Text style={styles.budgetCurrency}>$</Text>
             <TextInput
@@ -334,7 +336,7 @@ export default function PlanScreen() {
       {/* ── Next Step ── */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-          <Text style={styles.nextBtnText}>Next step</Text>
+          <Text style={styles.nextBtnText}>{t('plan')} →</Text>
         </TouchableOpacity>
       </View>
 
@@ -343,7 +345,7 @@ export default function PlanScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select City</Text>
+              <Text style={styles.modalTitle}>{t('whereTo')}</Text>
               <TouchableOpacity onPress={() => setShowCityModal(false)}>
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>

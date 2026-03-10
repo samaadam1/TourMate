@@ -6,6 +6,8 @@ import {
   KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Audio } from 'expo-av';
+import { useApp } from '../../constants/AppContext';
 
 const { width } = Dimensions.get('window');
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
@@ -28,8 +30,72 @@ const SUGGESTIONS = [
   '⚠️ Safety tips for tourists',
 ];
 
+// ── Message Bubble with speak button ─────────────────────────────────
 const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
   const isUser = message.role === 'user';
+  const [speaking, setSpeaking] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const soundRef = useRef<any>(null);
+
+  const handleSpeak = async () => {
+    // ── Resume if paused ──────────────────────────────────────────
+    if (paused && soundRef.current) {
+      await soundRef.current.playAsync();
+      setSpeaking(true);
+      setPaused(false);
+      return;
+    }
+
+    // ── Pause if playing ──────────────────────────────────────────
+    if (speaking && soundRef.current) {
+      await soundRef.current.pauseAsync();
+      setSpeaking(false);
+      setPaused(true);
+      return;
+    }
+
+    setLoadingAudio(true);
+    try {
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+
+      const res = await fetch(`${API_BASE}/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'TourMate AI',
+          description: message.content,
+          language: 'en',
+          // signal to backend: skip Groq, just TTS the text directly
+          raw_text: message.content,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error('TTS failed');
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: `data:audio/mpeg;base64,${data.audio}` },
+        { shouldPlay: true }
+      );
+      soundRef.current = sound;
+      setSpeaking(true);
+      setPaused(false);
+
+      sound.setOnPlaybackStatusUpdate((status: any) => {
+        if (status.didJustFinish) {
+          setSpeaking(false);
+          setPaused(false);
+          soundRef.current = null;
+        }
+      });
+    } catch (err) {
+      console.error('Speak error:', err);
+    } finally {
+      setLoadingAudio(false);
+    }
+  };
+
   return (
     <View style={[styles.bubbleRow, isUser && styles.bubbleRowUser]}>
       {!isUser && (
@@ -37,13 +103,32 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
           <Text style={styles.aiAvatarIcon}>🧳</Text>
         </View>
       )}
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
-        <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
-          {message.content}
-        </Text>
-        <Text style={[styles.bubbleTime, isUser && styles.bubbleTimeUser]}>
-          {message.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+      <View style={{ maxWidth: width * 0.72 }}>
+        <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
+          <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
+            {message.content}
+          </Text>
+          <Text style={[styles.bubbleTime, isUser && styles.bubbleTimeUser]}>
+            {message.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
+
+        {/* Speak button — only on AI messages */}
+        {!isUser && (
+          <TouchableOpacity
+            style={[styles.speakBtn, speaking && styles.speakBtnActive, paused && styles.speakBtnPaused]}
+            onPress={handleSpeak}
+            disabled={loadingAudio}
+            activeOpacity={0.8}
+          >
+            {loadingAudio
+              ? <ActivityIndicator size="small" color="#E67E22" />
+              : <Text style={[styles.speakBtnText, speaking && styles.speakBtnTextActive, paused && styles.speakBtnTextPaused]}>
+                  {speaking ? '⏸ Pause' : paused ? '▶ Resume' : '🔊 Listen'}
+                </Text>
+            }
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -51,6 +136,7 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
 
 export default function TourMateAIScreen() {
   const router = useRouter();
+  const { t } = useApp();
   const scrollRef = useRef<ScrollView>(null);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -131,7 +217,7 @@ export default function TourMateAIScreen() {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Tour Mate AI</Text>
+          <Text style={styles.headerTitle}>{t('aiTitle')}</Text>
           <View style={styles.onlineBadge}>
             <View style={styles.onlineDot} />
             <Text style={styles.onlineText}>Online</Text>
@@ -176,7 +262,7 @@ export default function TourMateAIScreen() {
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
-            placeholder="Ask about Egypt..."
+            {...{placeholder: t('aiPlaceholder')}}
             placeholderTextColor="#AAA"
             value={input}
             onChangeText={setInput}
@@ -215,13 +301,22 @@ const styles = StyleSheet.create({
   bubbleRowUser: { flexDirection: 'row-reverse' },
   aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF3E0', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
   aiAvatarIcon: { fontSize: 18 },
-  bubble: { maxWidth: width * 0.72, borderRadius: 20, padding: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  bubble: { borderRadius: 20, padding: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   bubbleAI: { backgroundColor: '#FFF', borderBottomLeftRadius: 4 },
   bubbleUser: { backgroundColor: '#E67E22', borderBottomRightRadius: 4 },
   bubbleText: { fontSize: 14, color: '#1A1A1A', lineHeight: 20 },
   bubbleTextUser: { color: '#FFF' },
   bubbleTime: { fontSize: 10, color: '#BBB', marginTop: 4, textAlign: 'right' },
   bubbleTimeUser: { color: 'rgba(255,255,255,0.7)' },
+
+  // Speak button
+  speakBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#FFF3E0', borderWidth: 1, borderColor: '#FDDCB5' },
+  speakBtnActive: { backgroundColor: '#FFE5E5', borderColor: '#FFAAAA' },
+  speakBtnPaused: { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' },
+  speakBtnText: { fontSize: 11, color: '#E67E22', fontWeight: '700' },
+  speakBtnTextActive: { color: '#E74C3C' },
+  speakBtnTextPaused: { color: '#27AE60' },
+
   typingBubble: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF', borderRadius: 20, borderBottomLeftRadius: 4, padding: 12 },
   typingText: { fontSize: 13, color: '#999' },
   suggestionsContainer: { marginTop: 8 },
