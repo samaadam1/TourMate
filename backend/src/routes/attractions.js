@@ -4,11 +4,41 @@ import pool from '../db.js';
 
 const router = express.Router();
 
-// GET /api/attractions/popular
+// ── Helper: base SELECT that joins cities + aggregates categories ─────
+const BASE_SELECT = `
+  SELECT
+    a.*,
+    ci.name AS city_name,
+    COALESCE(
+      ARRAY_AGG(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
+      '{}'
+    ) AS categories
+  FROM attractions a
+  LEFT JOIN cities ci ON ci.city_id = a.city_id
+  LEFT JOIN attraction_categories ac ON ac.attraction_id = a.id
+  LEFT JOIN categories c ON c.category_id = ac.category_id
+`;
+const GROUP_BY = `GROUP BY a.id, ci.name`;
+
+// ── Helper: convert Google Drive share link to direct URL ─────────────
+const convertDriveUrl = (url) => {
+  if (!url) return url;
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+  return url;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions/popular
+// ─────────────────────────────────────────────────────────────────────
 router.get('/popular', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM attractions WHERE is_popular = true ORDER BY rating DESC LIMIT 20'
+      `${BASE_SELECT}
+       WHERE a.is_popular = true
+       ${GROUP_BY}
+       ORDER BY a.rating DESC
+       LIMIT 50`
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
@@ -17,12 +47,18 @@ router.get('/popular', async (req, res) => {
   }
 });
 
-// GET /api/attractions/nearest?city=Alexandria
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions/nearest?city=Alexandria
+// ─────────────────────────────────────────────────────────────────────
 router.get('/nearest', async (req, res) => {
   try {
     const { city } = req.query;
     const result = await pool.query(
-      'SELECT * FROM attractions WHERE LOWER(city) = LOWER($1) ORDER BY rating DESC LIMIT 20',
+      `${BASE_SELECT}
+       WHERE LOWER(COALESCE(ci.name, a.city)) = LOWER($1)
+       ${GROUP_BY}
+       ORDER BY a.rating DESC
+       LIMIT 20`,
       [city ?? 'Alexandria']
     );
     res.json({ success: true, data: result.rows });
@@ -32,15 +68,23 @@ router.get('/nearest', async (req, res) => {
   }
 });
 
-// GET /api/attractions/search?q=pyramids
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions/search?q=pyramids
+// ─────────────────────────────────────────────────────────────────────
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
     if (!q) return res.json({ success: true, data: [] });
     const result = await pool.query(
-      `SELECT * FROM attractions 
-       WHERE name ILIKE $1 OR city ILIKE $1 OR description ILIKE $1 OR category ILIKE $1
-       ORDER BY rating DESC LIMIT 10`,
+      `${BASE_SELECT}
+       WHERE a.name        ILIKE $1
+          OR ci.name       ILIKE $1
+          OR a.city        ILIKE $1
+          OR a.description ILIKE $1
+          OR c.name        ILIKE $1
+       ${GROUP_BY}
+       ORDER BY a.rating DESC
+       LIMIT 10`,
       [`%${q}%`]
     );
     res.json({ success: true, data: result.rows });
@@ -50,14 +94,17 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// GET /api/attractions/favorites/:user_id
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions/favorites/:user_id
+// ─────────────────────────────────────────────────────────────────────
 router.get('/favorites/:user_id', async (req, res) => {
   try {
     const { user_id } = req.params;
     const result = await pool.query(
-      `SELECT a.* FROM attractions a
+      `${BASE_SELECT}
        INNER JOIN favorites f ON a.id = f.attraction_id
        WHERE f.user_id = $1
+       ${GROUP_BY}
        ORDER BY f.created_at DESC`,
       [user_id]
     );
@@ -68,25 +115,36 @@ router.get('/favorites/:user_id', async (req, res) => {
   }
 });
 
-// GET /api/attractions?city=Cairo&category=historical
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions?city=Cairo&category=historical
+// ─────────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
     const { city, category } = req.query;
-    let query = 'SELECT * FROM attractions WHERE 1=1';
     const params = [];
     let paramIndex = 1;
+    let where = 'WHERE 1=1';
 
     if (city) {
-      query += ` AND LOWER(city) = LOWER($${paramIndex++})`;
+      where += ` AND LOWER(COALESCE(ci.name, a.city)) = LOWER($${paramIndex++})`;
       params.push(city);
     }
     if (category && category !== 'all') {
-      query += ` AND LOWER(category) = LOWER($${paramIndex++})`;
+      where += ` AND EXISTS (
+        SELECT 1 FROM attraction_categories ac2
+        JOIN categories c2 ON c2.category_id = ac2.category_id
+        WHERE ac2.attraction_id = a.id AND LOWER(c2.name) = LOWER($${paramIndex++})
+      )`;
       params.push(category);
     }
 
-    query += ' ORDER BY rating DESC';
-    const result = await pool.query(query, params);
+    const result = await pool.query(
+      `${BASE_SELECT}
+       ${where}
+       ${GROUP_BY}
+       ORDER BY a.rating DESC`,
+      params
+    );
     res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error('Attractions error:', err);
@@ -94,7 +152,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/attractions/:id/images
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions/:id/images
+// ─────────────────────────────────────────────────────────────────────
 router.get('/:id/images', async (req, res) => {
   try {
     const { id } = req.params;
@@ -109,12 +169,16 @@ router.get('/:id/images', async (req, res) => {
   }
 });
 
-// GET /api/attractions/:id
+// ─────────────────────────────────────────────────────────────────────
+//  GET /api/attractions/:id
+// ─────────────────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT * FROM attractions WHERE id = $1',
+      `${BASE_SELECT}
+       WHERE a.id = $1
+       ${GROUP_BY}`,
       [id]
     );
     if (result.rows.length === 0) {
@@ -127,32 +191,57 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-
-// POST /api/attractions
+// ─────────────────────────────────────────────────────────────────────
+//  POST /api/attractions
+// ─────────────────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
     const {
-      name, city, category, description, image_url,
+      name, city, categories, description, image_url,
       rating, price_from, opening_hours, is_popular,
       latitude, longitude, images
     } = req.body;
 
-    if (!name || !city || !category) {
-      return res.status(400).json({ success: false, message: 'Name, city and category are required' });
+    if (!name || !city) {
+      return res.status(400).json({ success: false, message: 'Name and city are required' });
     }
+
+    // Look up city_id
+    const cityResult = await pool.query(
+      'SELECT city_id FROM cities WHERE LOWER(name) = LOWER($1)',
+      [city]
+    );
+    const city_id = cityResult.rows[0]?.city_id ?? null;
 
     const result = await pool.query(
       `INSERT INTO attractions
-        (name, city, category, description, image_url, rating, price_from, opening_hours, is_popular, latitude, longitude)
+        (name, city, city_id, description, image_url, rating, price_from, opening_hours, is_popular, latitude, longitude)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
-      [name, city, category, description ?? '', image_url ?? '', rating ?? 4.0,
+      [name, city, city_id, description ?? '', image_url ?? '', rating ?? 4.0,
        price_from ?? 0, opening_hours ?? '', is_popular ?? false,
        latitude ?? null, longitude ?? null]
     );
 
     const newAttraction = result.rows[0];
 
+    // Link categories (array of category names)
+    if (categories && categories.length > 0) {
+      for (const catName of categories) {
+        const catResult = await pool.query(
+          'SELECT category_id FROM categories WHERE LOWER(name) = LOWER($1)',
+          [catName]
+        );
+        if (catResult.rows[0]) {
+          await pool.query(
+            'INSERT INTO attraction_categories (attraction_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [newAttraction.id, catResult.rows[0].category_id]
+          );
+        }
+      }
+    }
+
+    // Insert images
     if (images && images.length > 0) {
       for (let i = 0; i < images.length; i++) {
         await pool.query(
@@ -169,34 +258,58 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/attractions/:id
+// ─────────────────────────────────────────────────────────────────────
+//  PUT /api/attractions/:id
+// ─────────────────────────────────────────────────────────────────────
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, city, category, description, image_url, rating, price_from, opening_hours, is_popular, latitude, longitude, images } = req.body;
-
-    // Convert Google Drive share link to direct URL if needed
-    const convertDriveUrl = (url) => {
-      if (!url) return url;
-      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (match) return `https://drive.google.com/uc?export=view&id=${match[1]}`;
-      return url;
-    };
+    const {
+      name, city, categories, description, image_url,
+      rating, price_from, opening_hours, is_popular,
+      latitude, longitude, images
+    } = req.body;
 
     const cleanImageUrl = convertDriveUrl(image_url);
 
-    // Update attractions table
+    // Look up city_id
+    const cityResult = await pool.query(
+      'SELECT city_id FROM cities WHERE LOWER(name) = LOWER($1)',
+      [city]
+    );
+    const city_id = cityResult.rows[0]?.city_id ?? null;
+
     const result = await pool.query(
       `UPDATE attractions SET
-        name=$1, city=$2, category=$3, description=$4, image_url=$5,
+        name=$1, city=$2, city_id=$3, description=$4, image_url=$5,
         rating=$6, price_from=$7, opening_hours=$8, is_popular=$9,
-        latitude=$10, longitude=$11
+        latitude=$10, longitude=$11, updated_at=NOW()
        WHERE id=$12 RETURNING *`,
-      [name, city, category, description, cleanImageUrl, rating, price_from, opening_hours, is_popular, latitude, longitude, id]
+      [name, city, city_id, description, cleanImageUrl, rating,
+       price_from, opening_hours, is_popular, latitude, longitude, id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Not found' });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
 
-    // If images array provided, replace all attraction_images
+    // Replace categories if provided
+    if (categories && categories.length > 0) {
+      await pool.query('DELETE FROM attraction_categories WHERE attraction_id = $1', [id]);
+      for (const catName of categories) {
+        const catResult = await pool.query(
+          'SELECT category_id FROM categories WHERE LOWER(name) = LOWER($1)',
+          [catName]
+        );
+        if (catResult.rows[0]) {
+          await pool.query(
+            'INSERT INTO attraction_categories (attraction_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [id, catResult.rows[0].category_id]
+          );
+        }
+      }
+    }
+
+    // Replace images if provided
     if (images && images.length > 0) {
       await pool.query('DELETE FROM attraction_images WHERE attraction_id = $1', [id]);
       for (let i = 0; i < images.length; i++) {
@@ -207,7 +320,6 @@ router.put('/:id', async (req, res) => {
         );
       }
     } else if (cleanImageUrl) {
-      // If only image_url provided with no images array, upsert as primary image
       const existing = await pool.query(
         'SELECT id FROM attraction_images WHERE attraction_id = $1 AND is_primary = true',
         [id]
@@ -232,10 +344,13 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/attractions/:id
+// ─────────────────────────────────────────────────────────────────────
+//  DELETE /api/attractions/:id
+// ─────────────────────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    await pool.query('DELETE FROM attraction_categories WHERE attraction_id = $1', [id]);
     await pool.query('DELETE FROM attraction_images WHERE attraction_id = $1', [id]);
     await pool.query('DELETE FROM favorites WHERE attraction_id = $1', [id]);
     await pool.query('DELETE FROM attractions WHERE id = $1', [id]);
@@ -246,7 +361,9 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/attractions/:id/favorite
+// ─────────────────────────────────────────────────────────────────────
+//  POST /api/attractions/:id/favorite
+// ─────────────────────────────────────────────────────────────────────
 router.post('/:id/favorite', async (req, res) => {
   try {
     const { id } = req.params;
@@ -278,8 +395,9 @@ router.post('/:id/favorite', async (req, res) => {
   }
 });
 
-
-// POST /api/attractions/upload-image (base64 → saves to local /uploads, returns URL)
+// ─────────────────────────────────────────────────────────────────────
+//  POST /api/attractions/upload-image
+// ─────────────────────────────────────────────────────────────────────
 router.post('/upload-image', async (req, res) => {
   try {
     const { image } = req.body;
@@ -305,15 +423,16 @@ router.post('/upload-image', async (req, res) => {
   }
 });
 
-// POST /api/attractions/download-images
-// Downloads photos from Google Places URLs and saves them locally
+// ─────────────────────────────────────────────────────────────────────
+//  POST /api/attractions/download-images
+// ─────────────────────────────────────────────────────────────────────
 router.post('/download-images', async (req, res) => {
   try {
     const { urls } = req.body;
     if (!urls || urls.length === 0) return res.status(400).json({ success: false, message: 'No URLs provided' });
 
-    const fs   = await import('fs');
-    const path = await import('path');
+    const fs    = await import('fs');
+    const path  = await import('path');
     const https = await import('https');
     const http  = await import('http');
 
@@ -327,7 +446,6 @@ router.post('/download-images', async (req, res) => {
       const client   = url.startsWith('https') ? https.default : http.default;
 
       const request = client.get(url, (response) => {
-        // Follow redirects
         if (response.statusCode === 301 || response.statusCode === 302) {
           file.close();
           fs.default.unlinkSync(filepath);
@@ -359,7 +477,7 @@ router.post('/download-images', async (req, res) => {
         savedUrls.push(localUrl);
       } catch (err) {
         console.error('Failed to download image:', url, err.message);
-        savedUrls.push(url); // fallback: keep original URL
+        savedUrls.push(url);
       }
     }
 

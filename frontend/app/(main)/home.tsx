@@ -54,6 +54,17 @@ const ATTRACTION_COORDS: Record<number, { lat: number; lon: number }> = {
   19: { lat: 27.8623, lon: 34.3088 }, // Ras Mohammed
 };
 
+// ── Safely parse categories from DB (may come as string or array) ────
+const parseCategories = (cats: any): string[] => {
+  if (!cats) return [];
+  if (Array.isArray(cats)) return cats.map((c: string) => c.toLowerCase());
+  if (typeof cats === 'string') {
+    // PostgreSQL array format: "{historical,culture}" or "historical,culture"
+    return cats.replace(/[{}]/g, '').split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+  }
+  return [];
+};
+
 const getWeatherInfo = (code: number) => {
   if (code === 0)  return { icon: '☀️', label: 'Clear' };
   if (code <= 2)   return { icon: '⛅', label: 'Partly Cloudy' };
@@ -498,7 +509,7 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
         body: JSON.stringify({
           name: attraction.name,
           city: attraction.city,
-          category: attraction.category,
+          category: parseCategories(attraction.categories)[0] ?? attraction.category,
           description: attraction.description,
           price_from: attraction.price_from,
           opening_hours: attraction.opening_hours,
@@ -533,7 +544,8 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
 
   if (!attraction) return null;
 
-  const categoryColor = CATEGORY_COLORS[attraction.category] ?? '#E67E22';
+  const firstCategory = parseCategories(attraction.categories)[0] ?? attraction.category ?? '';
+  const categoryColor = CATEGORY_COLORS[firstCategory] ?? '#E67E22';
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
@@ -584,7 +596,7 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
 
           {/* Category badge */}
           <View style={[styles.categoryBadge, { backgroundColor: categoryColor }]}>
-            <Text style={styles.categoryBadgeText}>{attraction.category}</Text>
+            <Text style={styles.categoryBadgeText}>{firstCategory}</Text>
           </View>
         </View>
 
@@ -623,7 +635,9 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
               <Text style={styles.infoPillIcon}>🏷️</Text>
               <View>
                 <Text style={styles.infoPillLabel}>{t('category')}</Text>
-                <Text style={[styles.infoPillValue, { textTransform: 'capitalize' }]}>{attraction.category}</Text>
+                <Text style={[styles.infoPillValue, { textTransform: 'capitalize' }]}>
+                  {parseCategories(attraction.categories).join(', ') || attraction.category}
+                </Text>
               </View>
             </View>
           </ScrollView>
@@ -966,7 +980,11 @@ export default function HomeScreen() {
   // ── Apply active filters ────────────────────────────────────────────
   const applyFilters = (list: Attraction[]) => {
     return list.filter(item => {
-      if (activeFilters.categories.length > 0 && !activeFilters.categories.includes(item.category.toLowerCase())) return false;
+      if (activeFilters.categories.length > 0) {
+        const itemCats = parseCategories(item.categories);
+        const hasMatch = activeFilters.categories.some(f => itemCats.includes(f));
+        if (!hasMatch) return false;
+      }
       if (activeFilters.maxPrice !== null && Number(item.price_from) > activeFilters.maxPrice) return false;
       if (activeFilters.minRating > 0 && Number(item.rating) < activeFilters.minRating) return false;
       return true;

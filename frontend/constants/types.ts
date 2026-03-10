@@ -3,17 +3,16 @@
 export interface Attraction {
   id: number;
   name: string;
-  description: string;
-  location: string;
   city: string;
-  country: string;
-  category: string;
-  price_from: number;
-  rating: number;
-  review_count: number;
+  city_name?: string;      // ← also add this
+  categories?: string[];   // ← add this
+  category?: string;       // ← change to optional
+  description: string;
   image_url: string;
-  latitude: number;
-  longitude: number;
-  is_featured: boolean;
+  rating: number;
+  price_from: number;
   opening_hours?: string;
+  is_popular?: boolean;
+  latitude?: number;
+  longitude?: number;
 }
