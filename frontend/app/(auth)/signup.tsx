@@ -1,19 +1,11 @@
 // frontend/app/(auth)/signup.tsx
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useState } from 'react';
 import { api } from '../../api';
 import { COLORS } from '../../constants/colors';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import ScreenWrapper from '../../components/ScreenWrapper';
 
 export default function SignUp() {
   const [username, setUsername] = useState('');
@@ -23,41 +15,69 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [showRepeatPassword, setShowRepeatPassword] = useState(false);
 
+  // ✅ one error state per field
+  const [errors, setErrors] = useState({
+    username: '',
+    email: '',
+    password: '',
+    repeatPassword: '',
+  });
+
   const router = useRouter();
 
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   const handleSignUp = async () => {
-    if (!username || !email || !password || !repeatPassword) {
-      return alert('Please fill all fields');
+    // reset all errors first
+    const newErrors = { username: '', email: '', password: '', repeatPassword: '' };
+    let hasError = false;
+
+    if (!username) {
+      newErrors.username = 'Username is required';
+      hasError = true;
+    }
+    
+    if (!email) {
+      newErrors.email = 'Email is required';
+      hasError = true;
+    } else if (!validateEmail(email)) {
+      newErrors.email = 'Enter a valid email address';
+      hasError = true;
+    }
+    if (!password) {
+      newErrors.password = 'Password is required';
+      hasError = true;
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+      hasError = true;
+    }
+    if (!repeatPassword) {
+      newErrors.repeatPassword = 'Please repeat your password';
+      hasError = true;
+    } else if (password !== repeatPassword) {
+      newErrors.repeatPassword = 'Passwords do not match';
+      hasError = true;
     }
 
-    if (password !== repeatPassword) {
-      return alert('Passwords do not match');
-    }
+    setErrors(newErrors);
+    if (hasError) return; // ✅ stops here instantly, no server call
 
     try {
       const res = await api.post('/auth/register', { username, email, password });
-
       (router as any).push({
         pathname: '/(auth)/confirmation',
-        params: {
-          username,
-          email,
-          userId: res.data.id,
-          token: res.data.token,
-        },
+        params: { username, email, userId: res.data.id, token: res.data.token },
       });
     } catch (error: any) {
       const message = error?.response?.data?.error || 'Sign up failed';
-      alert(message);
+      // show server error under email (most likely duplicate email)
+      setErrors(prev => ({ ...prev, email: message }));
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#fff' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.container}>
+    <ScreenWrapper scroll>
+      <View style={styles.container}>
         <Text style={styles.title}>Sign up</Text>
 
         {/* Username */}
@@ -65,22 +85,39 @@ export default function SignUp() {
         <TextInput
           placeholder="Enter your username"
           value={username}
-          onChangeText={setUsername}
-          style={styles.input}
+          onChangeText={(text) => {
+            setUsername(text);
+            if (errors.username) setErrors(prev => ({ ...prev, username: '' }));
+          }}
+          onBlur={() => {                                               // fires when user leaves field
+            if (!username) setErrors(prev => ({ ...prev, username: 'Username is required' }));
+            if (username.length < 3) setErrors(prev => ({ ...prev, username: 'Username must be at least 3 characters' }));
+
+          }}
+          style={[styles.input, errors.username ? styles.inputError : null]}
           placeholderTextColor="#999"
         />
+        {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
 
         {/* Email */}
         <Text style={styles.inputLabel}>Email</Text>
         <TextInput
           placeholder="Enter your email"
           value={email}
-          onChangeText={setEmail}
-          style={styles.input}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+          }}
+          onBlur={() => {                                            
+            if (!email) setErrors(prev => ({ ...prev, email: 'Email is required' }));
+            else if (!validateEmail(email)) setErrors(prev => ({ ...prev, email: 'Enter a valid email address' }));
+          }}
+          style={[styles.input, errors.email ? styles.inputError : null]}
           placeholderTextColor="#999"
           keyboardType="email-address"
           autoCapitalize="none"
         />
+        {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
 
         {/* Password */}
         <Text style={styles.inputLabel}>Password</Text>
@@ -89,21 +126,22 @@ export default function SignUp() {
             placeholder="Create a password"
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={setPassword}
-            style={styles.passwordInput}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+            }}
+            onBlur={() => {                                           
+              if (!password) setErrors(prev => ({ ...prev, password: 'Password is required' }));
+              else if (password.length < 6) setErrors(prev => ({ ...prev, password: 'Password must be at least 6 characters' }));
+            }}
+            style={[styles.passwordInput, errors.password ? styles.inputError : null]}
             placeholderTextColor="#999"
           />
-          <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons
-              name={showPassword ? 'eye' : 'eye-off'}
-              size={24}
-              color="#888"
-            />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+            <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={24} color="#888" />
           </TouchableOpacity>
         </View>
+        {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
 
         {/* Repeat Password */}
         <Text style={styles.inputLabel}>Repeat Password</Text>
@@ -112,103 +150,61 @@ export default function SignUp() {
             placeholder="Repeat your password"
             secureTextEntry={!showRepeatPassword}
             value={repeatPassword}
-            onChangeText={setRepeatPassword}
-            style={styles.passwordInput}
+            onChangeText={(text) => {
+              setRepeatPassword(text);
+              if (errors.repeatPassword) setErrors(prev => ({ ...prev, repeatPassword: '' }));
+            }}
+            onBlur={() => {                                             // ✅
+              if (!repeatPassword) setErrors(prev => ({ ...prev, repeatPassword: 'Please repeat your password' }));
+              else if (password !== repeatPassword) setErrors(prev => ({ ...prev, repeatPassword: 'Passwords do not match' }));
+            }}
+            style={[styles.passwordInput, errors.repeatPassword ? styles.inputError : null]}
             placeholderTextColor="#999"
           />
-          <TouchableOpacity
-            onPress={() => setShowRepeatPassword(!showRepeatPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons
-              name={showRepeatPassword ? 'eye' : 'eye-off'}
-              size={24}
-              color="#888"
-            />
+          <TouchableOpacity onPress={() => setShowRepeatPassword(!showRepeatPassword)} style={styles.eyeIcon}>
+            <Ionicons name={showRepeatPassword ? 'eye' : 'eye-off'} size={24} color="#888" />
           </TouchableOpacity>
         </View>
-
-        {/* Sign up button */}
+        {errors.repeatPassword ? <Text style={styles.errorText}>{errors.repeatPassword}</Text> : null}
         <TouchableOpacity onPress={handleSignUp} style={styles.signupButton}>
           <Text style={styles.signupButtonText}>Continue</Text>
         </TouchableOpacity>
 
-        {/* Already have account */}
         <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
           <Text style={styles.loginText}>
             Already have an account? <Text style={styles.loginLink}>Login</Text>
           </Text>
         </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 24,
-    justifyContent: 'center',
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 16,
-    color: '#333',
-  },
+  container: { padding: 24, justifyContent: 'center', flexGrow: 1 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24 },
+  inputLabel: { fontSize: 16, fontWeight: '600', marginTop: 16, color: '#333' },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    marginTop: 6,
-    padding: 14,
-    borderRadius: 20,
-    fontSize: 16,
-    color: '#000',
+    borderWidth: 1, borderColor: '#ccc', marginTop: 6,
+    padding: 14, borderRadius: 20, fontSize: 16, color: '#000',
   },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+  inputError: {
+    borderColor: '#E53935', 
   },
+  errorText: {
+    color: '#E53935',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 14,
+  },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
   passwordInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 14,
-    borderRadius: 20,
-    fontSize: 16,
-    color: '#000',
+    flex: 1, borderWidth: 1, borderColor: '#ccc',
+    padding: 14, borderRadius: 20, fontSize: 16, color: '#000',
   },
-  eyeIcon: {
-    position: 'absolute',
-    right: 20,
-  },
-  signupButton: {
-    backgroundColor: COLORS.primary,
-    padding: 16,
-    borderRadius: 30,
-    marginTop: 30,
-  },
-  signupButtonText: {
-    textAlign: 'center',
-    fontWeight: 'bold',
-    color: '#fff',
-    fontSize: 16,
-  },
-  loginText: {
-    marginTop: 16,
-    textAlign: 'center',
-    fontSize: 14,
-    color: '#444',
-  },
-  loginLink: {
-    textDecorationLine: 'underline',
-    color: '#007AFF',
-    fontWeight: '600',
-  },
+  eyeIcon: { position: 'absolute', right: 20 },
+  signupButton: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 30, marginTop: 30 },
+  signupButtonText: { textAlign: 'center', fontWeight: 'bold', color: '#fff', fontSize: 16 },
+  loginText: { marginTop: 16, textAlign: 'center', fontSize: 14, color: '#444' },
+  loginLink: { textDecorationLine: 'underline', color: '#007AFF', fontWeight: '600' },
 });

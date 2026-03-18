@@ -1,9 +1,10 @@
 // app/(auth)/login.tsx
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ScreenWrapper from '@/components/ScreenWrapper';
 
 const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
 
@@ -12,13 +13,32 @@ export default function Login() {
   const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading]           = useState(false);
+
+  const [errors, setErrors] = useState({ email: '', password: '', general: '' });
+
   const router = useRouter();
 
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter your email and password.');
-      return;
+    const newErrors = { email: '', password: '', general: '' };
+    let hasError = false;
+
+    if (!email) {
+      newErrors.email = 'Email is required';
+      hasError = true;
+    } else if (!validateEmail(email)) {
+      newErrors.email = 'Enter a valid email address';
+      hasError = true;
     }
+    if (!password) {
+      newErrors.password = 'Password is required';
+      hasError = true;
+    }
+
+    setErrors(newErrors);
+    if (hasError) return;
+
     setLoading(true);
     try {
       const res  = await fetch(`${API_BASE}/auth/login`, {
@@ -29,15 +49,14 @@ export default function Login() {
       const data = await res.json();
 
       if (!res.ok) {
-        Alert.alert('Login Failed', data.error ?? 'Invalid credentials.');
+        // ✅ server errors show inline instead of Alert
+        setErrors(prev => ({ ...prev, general: data.error ?? 'Invalid credentials.' }));
         return;
       }
 
-      // Save token and user to storage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
-      // Route based on role
       if (data.user.role === 'admin') {
         router.replace('/(admin)/dashboard' as any);
       } else {
@@ -45,66 +64,94 @@ export default function Login() {
       }
     } catch (err) {
       console.error(err);
-      Alert.alert('Error', 'Could not connect to server. Please check your connection.');
+      setErrors(prev => ({ ...prev, general: 'Could not connect to server. Check your connection.' }));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-        <Text style={styles.logoEmoji}>🧳</Text>
-        <Text style={styles.logoText}>TourMate</Text>
-        <Text style={styles.logoSubtitle}>Your Egyptian adventure awaits</Text>
-      </View>
+    <ScreenWrapper>
+      <View style={styles.container}>
 
-      <Text style={styles.title}>Sign in</Text>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoEmoji}>🧳</Text>
+          <Text style={styles.logoText}>TourMate</Text>
+          <Text style={styles.logoSubtitle}>Your Egyptian adventure awaits</Text>
+        </View>
 
-      {/* Email */}
-      <Text style={styles.inputLabel}>Email</Text>
-      <TextInput
-        placeholder="Enter your email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        placeholderTextColor="#999"
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+        <Text style={styles.title}>Sign in</Text>
 
-      {/* Password */}
-      <Text style={styles.inputLabel}>Password</Text>
-      <View style={styles.passwordContainer}>
+        {/* General error (wrong credentials / network) */}
+        {errors.general ? (
+          <View style={styles.generalError}>
+            <Text style={styles.generalErrorText}>{errors.general}</Text>
+          </View>
+        ) : null}
+
+        {/* Email */}
+        <Text style={styles.inputLabel}>Email</Text>
         <TextInput
-          placeholder="Enter your password"
-          secureTextEntry={!showPassword}
-          value={password}
-          onChangeText={setPassword}
-          style={styles.passwordInput}
+          placeholder="Enter your email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+            if (errors.general) setErrors(prev => ({ ...prev, general: '' }));
+          }}
+          onBlur={() => {
+            if (!email) setErrors(prev => ({ ...prev, email: 'Email is required' }));
+            else if (!validateEmail(email)) setErrors(prev => ({ ...prev, email: 'Enter a valid email address' }));
+          }}
+          style={[styles.input, errors.email ? styles.inputError : null]}
           placeholderTextColor="#999"
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
-        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-          <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={24} color="#888" />
+        {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+
+        {/* Password */}
+        <Text style={styles.inputLabel}>Password</Text>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            placeholder="Enter your password"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+              if (errors.general) setErrors(prev => ({ ...prev, general: '' }));
+            }}
+            onBlur={() => {
+              if (!password) setErrors(prev => ({ ...prev, password: 'Password is required' }));
+            }}
+            style={[styles.passwordInput, errors.password ? styles.inputError : null]}
+            placeholderTextColor="#999"
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+            <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={24} color="#888" />
+          </TouchableOpacity>
+        </View>
+        {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+
+        {/* Login Button */}
+        <TouchableOpacity onPress={handleLogin} style={styles.loginButton} disabled={loading} activeOpacity={0.85}>
+          {loading
+            ? <ActivityIndicator color="#FFF" />
+            : <Text style={styles.loginButtonText}>Continue</Text>
+          }
         </TouchableOpacity>
+
+        {/* Signup */}
+        <TouchableOpacity onPress={() => router.push('/(auth)/signup' as any)}>
+          <Text style={styles.signupText}>
+            Don't have an account? <Text style={styles.signupLink}>Sign up</Text>
+          </Text>
+        </TouchableOpacity>
+
       </View>
-
-      {/* Login Button */}
-      <TouchableOpacity onPress={handleLogin} style={styles.loginButton} disabled={loading} activeOpacity={0.85}>
-        {loading
-          ? <ActivityIndicator color="#FFF" />
-          : <Text style={styles.loginButtonText}>Continue</Text>
-        }
-      </TouchableOpacity>
-
-      {/* Signup */}
-      <TouchableOpacity onPress={() => router.push('/(auth)/signup' as any)}>
-        <Text style={styles.signupText}>
-          Don't have an account? <Text style={styles.signupLink}>Sign up</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
+    </ScreenWrapper>
   );
 }
 
@@ -118,7 +165,14 @@ const styles = StyleSheet.create({
 
   title:      { fontSize: 26, fontWeight: '800', color: '#1A1A1A', marginBottom: 8 },
   inputLabel: { fontSize: 15, fontWeight: '600', marginTop: 16, color: '#333', marginBottom: 6 },
-  input:      { borderWidth: 1, borderColor: '#E0E0E0', padding: 14, borderRadius: 14, fontSize: 16, color: '#000', backgroundColor: '#FAFAFA' },
+
+  input:         { borderWidth: 1, borderColor: '#E0E0E0', padding: 14, borderRadius: 14, fontSize: 16, color: '#000', backgroundColor: '#FAFAFA' },
+  inputError:    { borderColor: '#E53935' },
+  errorText:     { color: '#E53935', fontSize: 12, marginTop: 4, marginLeft: 14 },
+
+  // ✅ new: banner for server errors like "Invalid credentials"
+  generalError:     { backgroundColor: '#FFEBEE', borderRadius: 10, padding: 12, marginBottom: 8 },
+  generalErrorText: { color: '#C62828', fontSize: 14, textAlign: 'center' },
 
   passwordContainer: { flexDirection: 'row', alignItems: 'center' },
   passwordInput:     { flex: 1, borderWidth: 1, borderColor: '#E0E0E0', padding: 14, borderRadius: 14, fontSize: 16, color: '#000', backgroundColor: '#FAFAFA' },

@@ -5,6 +5,8 @@ import {
   TouchableOpacity, Image, FlatList, ActivityIndicator,
   StatusBar, SafeAreaView, Modal, Dimensions, Animated,
   PanResponder, Linking, Platform,
+  TouchableWithoutFeedback,Pressable,
+  Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
@@ -834,12 +836,12 @@ const BottomTab: React.FC<{ active: string }> = ({ active }) => {
 
 // ── Currency Modal ────────────────────────────────────────────────────
 const CurrencyModal: React.FC<{ visible: boolean; onClose: () => void }> = ({ visible, onClose }) => {
-  const [amount, setAmount]           = useState('1');
+  const [amount, setAmount]                     = useState('1');
   const [selectedCurrency, setSelectedCurrency] = useState(CURRENCIES[0]);
-  const [rate, setRate]               = useState<number | null>(null);
-  const [loading, setLoading]         = useState(false);
-  const [lastUpdated, setLastUpdated] = useState('');
-  const [showPicker, setShowPicker]   = useState(false);
+  const [rate, setRate]                         = useState<number | null>(null);
+  const [loading, setLoading]                   = useState(false);
+  const [lastUpdated, setLastUpdated]           = useState('');
+  const [showPicker, setShowPicker]             = useState(false);
 
   useEffect(() => { if (visible) fetchRate(selectedCurrency.code); }, [visible]);
 
@@ -861,9 +863,13 @@ const CurrencyModal: React.FC<{ visible: boolean; onClose: () => void }> = ({ vi
   const converted = rate && amount ? (parseFloat(amount || '0') * rate).toFixed(2) : '—';
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.currencySheet}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      {/* ✅ Backdrop as a simple Pressable — no nesting issues */}
+      <Pressable style={styles.modalOverlay} onPress={Keyboard.dismiss}>
+
+        {/* ✅ Stop press from bubbling to backdrop */}
+        <Pressable style={styles.currencySheet} onPress={Keyboard.dismiss}>
+
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>💱 Currency Exchange</Text>
             <TouchableOpacity onPress={onClose}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
@@ -899,7 +905,14 @@ const CurrencyModal: React.FC<{ visible: boolean; onClose: () => void }> = ({ vi
           <Text style={styles.currencyLabel}>Amount</Text>
           <View style={styles.amountRow}>
             <Text style={styles.amountCurrencyCode}>{selectedCurrency.code}</Text>
-            <TextInput style={styles.amountInput} value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="1" placeholderTextColor="#AAA" />
+            <TextInput
+              style={styles.amountInput}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+              placeholder="1"
+              placeholderTextColor="#AAA"
+            />
           </View>
           <View style={styles.convertArrow}><Text style={styles.convertArrowIcon}>↓</Text></View>
           <Text style={styles.currencyLabel}>To</Text>
@@ -912,8 +925,9 @@ const CurrencyModal: React.FC<{ visible: boolean; onClose: () => void }> = ({ vi
             {loading ? <ActivityIndicator size="small" color="#E67E22" /> : <Text style={styles.resultAmount}>{converted}</Text>}
           </View>
           {rate && <Text style={styles.rateInfo}>1 {selectedCurrency.code} = {rate.toFixed(4)} EGP</Text>}
-        </View>
-      </View>
+
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };

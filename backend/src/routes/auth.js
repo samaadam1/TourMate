@@ -9,18 +9,43 @@ const router = express.Router();
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username: rawUsername, email: rawEmail, password } = req.body;
+    const username = rawUsername?.trim();
+    const email = rawEmail?.trim().toLowerCase();
+
+    // presence check
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'Username, email, and password are required' });
     }
+
+    // format checks
+    if (username.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await pool.query(
       'INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, username, email, role',
       [username, email, hashedPassword, 'user']
     );
     res.status(201).json(newUser.rows[0]);
+
   } catch (err) {
-    if (err.code === '23505') return res.status(400).json({ error: 'User already exists' });
+    if (err.code === '23505') {
+      if (err.constraint?.includes('email')) {
+        return res.status(400).json({ error: 'This email is already registered' });
+      }
+      if (err.constraint?.includes('username')) {
+        return res.status(400).json({ error: 'This username is already taken' });
+      }
+      return res.status(400).json({ error: 'User already exists' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -29,24 +54,39 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = rawEmail?.trim().toLowerCase(); // ✅ trim + lowercase
+
+    // presence check
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
+
+    // ✅ format check — reject obviously bad emails before hitting the DB
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+
+    // ✅ same message for "not found" and "wrong password" — prevents email enumeration
+    // (attacker can't tell if the email exists or not)
     if (result.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
+
     const user = result.rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
+
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
     res.json({
       token,
       user: { id: user.id, email: user.email, username: user.username, role: user.role },

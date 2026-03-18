@@ -8,7 +8,10 @@
     "scheme": "tourmate",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -46,7 +49,9 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow TourMate to use your location."
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

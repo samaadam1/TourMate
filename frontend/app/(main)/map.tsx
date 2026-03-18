@@ -4,6 +4,7 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   FlatList, ActivityIndicator, SafeAreaView, Alert,
   Dimensions, ScrollView, Animated, Modal,
+  Keyboard,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -480,10 +481,13 @@ export default function MapScreen() {
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-{...{placeholder: t('search')}}
+                {...{placeholder: t('search')}}
               placeholderTextColor="#AAA"
               value={searchQuery}
               onChangeText={searchPlaces}
+                onBlur={Keyboard.dismiss}     // ✅ dismiss when user taps away
+                returnKeyType="search"        // ✅ shows search button on keyboard
+                onSubmitEditing={Keyboard.dismiss} // ✅ dismiss when user presses search
             />
             {loadingSearch && <ActivityIndicator size="small" color="#E67E22" />}
           </View>
