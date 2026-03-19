@@ -12,10 +12,12 @@ const API_BASE = `http://${process.env.EXPO_PUBLIC_API_URL}:3000/api`;
 interface Attraction {
   id: number;
   name: string;
-  city: string;
-  category: string;
+  city: string;          // ← still fine, comes from ci.name AS city
+  city_id?: number;      // ← add this
+  categories?: string[]; // ← change from category: string
+  category?: string;     // ← keep as optional fallback
   description: string;
-  image_url: string;
+  primary_image: string; // ← was image_url
   rating: number;
   price_from: number;
   opening_hours: string;
@@ -83,11 +85,11 @@ const EditModal: React.FC<{
       const data = await res.json();
       if (data.success && data.data.length > 0) {
         setImages(data.data.map((img: any) => img.image_url));
-      } else if (attraction?.image_url) {
-        setImages([attraction.image_url]);
+      } else if (attraction?.primary_image) {
+        setImages([attraction.primary_image]);
       }
     } catch {
-      if (attraction?.image_url) setImages([attraction.image_url]);
+      if (attraction?.primary_image) setImages([attraction.primary_image]);
     }
   };
 
@@ -108,7 +110,7 @@ const EditModal: React.FC<{
     if (images.length === 0) { Alert.alert('Error', 'Add at least one image.'); return; }
     onSave({
       name, city, category, description,
-      image_url: images[0],
+      // image_url: images[0],
       rating: parseFloat(rating),
       price_from: parseFloat(price),
       opening_hours: hours,
@@ -324,8 +326,8 @@ export default function AdminAttractionsScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           renderItem={({ item }) => (
             <View style={styles.attractionRow}>
-              {item.image_url ? (
-                <Image source={{ uri: item.image_url }} style={styles.attractionThumb} />
+              {item.primary_image ? (
+                <Image source={{ uri: item.primary_image }} style={styles.attractionThumb} />
               ) : (
                 <View style={[styles.attractionThumb, styles.attractionThumbEmpty]}>
                   <Text style={{ fontSize: 20 }}>🏛️</Text>

@@ -8,7 +8,9 @@ export interface Attraction {
   categories?: string[];   // ← add this
   category?: string;       // ← change to optional
   description: string;
-  image_url: string;
+  image_url?: string;        // ← keep as optional for now during transition
+  primary_image: string; 
+  // image_url: string;
   rating: number;
   price_from: number;
   opening_hours?: string;

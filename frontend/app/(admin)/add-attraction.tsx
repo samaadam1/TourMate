@@ -146,7 +146,7 @@ export default function AddAttractionScreen() {
           city: finalCity,
           category: finalCategory,
           description: finalDesc,
-          image_url: finalImages[0] ?? '',
+          // image_url: finalImages[0] ?? '',
           rating: parseFloat(finalRating) || 4.0,
           price_from: 0,
           opening_hours: finalHours,
@@ -202,7 +202,7 @@ export default function AddAttractionScreen() {
         body: JSON.stringify({
           name: name.trim(), city, category,
           description: description.trim(),
-          image_url: images[0],
+          // image_url: images[0],
           rating: parseFloat(rating) || 4.0,
           price_from: parseFloat(price) || 0,
           opening_hours: hours.trim(),

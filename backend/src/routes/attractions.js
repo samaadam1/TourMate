@@ -8,16 +8,24 @@ const router = express.Router();
 const BASE_SELECT = `
   SELECT
     a.*,
-    ci.name AS city_name,
+    ci.name AS city,
     COALESCE(
       ARRAY_AGG(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL),
       '{}'
-    ) AS categories
+    ) AS categories,
+    (
+      SELECT ai.image_url
+      FROM attraction_images ai
+      WHERE ai.attraction_id = a.id
+        AND ai.is_primary = true
+      LIMIT 1
+    ) AS primary_image
   FROM attractions a
   LEFT JOIN cities ci ON ci.city_id = a.city_id
   LEFT JOIN attraction_categories ac ON ac.attraction_id = a.id
   LEFT JOIN categories c ON c.category_id = ac.category_id
 `;
+
 const GROUP_BY = `GROUP BY a.id, ci.name`;
 
 // ── Helper: convert Google Drive share link to direct URL ─────────────
@@ -55,7 +63,7 @@ router.get('/nearest', async (req, res) => {
     const { city } = req.query;
     const result = await pool.query(
       `${BASE_SELECT}
-       WHERE LOWER(COALESCE(ci.name, a.city)) = LOWER($1)
+       WHERE LOWER(ci.name) = LOWER($1)
        ${GROUP_BY}
        ORDER BY a.rating DESC
        LIMIT 20`,
@@ -79,7 +87,6 @@ router.get('/search', async (req, res) => {
       `${BASE_SELECT}
        WHERE a.name        ILIKE $1
           OR ci.name       ILIKE $1
-          OR a.city        ILIKE $1
           OR a.description ILIKE $1
           OR c.name        ILIKE $1
        ${GROUP_BY}
@@ -126,7 +133,7 @@ router.get('/', async (req, res) => {
     let where = 'WHERE 1=1';
 
     if (city) {
-      where += ` AND LOWER(COALESCE(ci.name, a.city)) = LOWER($${paramIndex++})`;
+      where += ` AND LOWER(ci.name) = LOWER($${paramIndex++})`;
       params.push(city);
     }
     if (category && category !== 'all') {
@@ -197,7 +204,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      name, city, categories, description, image_url,
+      name, city, categories, description,
       rating, price_from, opening_hours, is_popular,
       latitude, longitude, images
     } = req.body;
@@ -213,15 +220,24 @@ router.post('/', async (req, res) => {
     );
     const city_id = cityResult.rows[0]?.city_id ?? null;
 
+    // const result = await pool.query(
+    //   `INSERT INTO attractions
+    //     (name, city, city_id, description, image_url, rating, price_from, opening_hours, is_popular, latitude, longitude)
+    //    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    //    RETURNING *`,
+    //   [name, city, city_id, description ?? '', image_url ?? '', rating ?? 4.0,
+    //    price_from ?? 0, opening_hours ?? '', is_popular ?? false,
+    //    latitude ?? null, longitude ?? null]
+    // );
     const result = await pool.query(
-      `INSERT INTO attractions
-        (name, city, city_id, description, image_url, rating, price_from, opening_hours, is_popular, latitude, longitude)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       RETURNING *`,
-      [name, city, city_id, description ?? '', image_url ?? '', rating ?? 4.0,
-       price_from ?? 0, opening_hours ?? '', is_popular ?? false,
-       latitude ?? null, longitude ?? null]
-    );
+  `INSERT INTO attractions
+    (name, city_id, description, rating, price_from, opening_hours, is_popular, latitude, longitude)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+   RETURNING *`,
+  [name, city_id, description ?? '', rating ?? 4.0,
+   price_from ?? 0, opening_hours ?? '', is_popular ?? false,
+   latitude ?? null, longitude ?? null]
+);
 
     const newAttraction = result.rows[0];
 
@@ -265,7 +281,7 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      name, city, categories, description, image_url,
+      name, city, categories, description,
       rating, price_from, opening_hours, is_popular,
       latitude, longitude, images
     } = req.body;
@@ -279,14 +295,23 @@ router.put('/:id', async (req, res) => {
     );
     const city_id = cityResult.rows[0]?.city_id ?? null;
 
+    // const result = await pool.query(
+    //   `UPDATE attractions SET
+    //     name=$1, city=$2, city_id=$3, description=$4, image_url=$5,
+    //     rating=$6, price_from=$7, opening_hours=$8, is_popular=$9,
+    //     latitude=$10, longitude=$11, updated_at=NOW()
+    //    WHERE id=$12 RETURNING *`,
+    //   [name, city, city_id, description, cleanImageUrl, rating,
+    //    price_from, opening_hours, is_popular, latitude, longitude, id]
+    // );
     const result = await pool.query(
       `UPDATE attractions SET
-        name=$1, city=$2, city_id=$3, description=$4, image_url=$5,
-        rating=$6, price_from=$7, opening_hours=$8, is_popular=$9,
-        latitude=$10, longitude=$11, updated_at=NOW()
-       WHERE id=$12 RETURNING *`,
-      [name, city, city_id, description, cleanImageUrl, rating,
-       price_from, opening_hours, is_popular, latitude, longitude, id]
+        name=$1, city_id=$2, description=$3,
+        rating=$4, price_from=$5, opening_hours=$6, is_popular=$7,
+        latitude=$8, longitude=$9, updated_at=NOW()
+      WHERE id=$10 RETURNING *`,
+      [name, city_id, description, rating,
+      price_from, opening_hours, is_popular, latitude, longitude, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Not found' });

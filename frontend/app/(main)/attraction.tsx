@@ -79,7 +79,7 @@ export default function AttractionDetailsScreen() {
 
       {/* ── Hero Image ── */}
       <View style={styles.heroContainer}>
-        <Image source={{ uri: attraction.image_url }} style={styles.heroImage} />
+        <Image source={{ uri: attraction.primary_image }} style={styles.heroImage} />
         <View style={styles.heroGradient} />
 
         {/* Top Buttons */}

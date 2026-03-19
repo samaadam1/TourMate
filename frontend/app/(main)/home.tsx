@@ -476,11 +476,11 @@ const AttractionSheet: React.FC<AttractionSheetProps> = ({ attraction, visible, 
       if (data.success && data.data.length > 0) {
         setImages(data.data.map((img: any) => img.image_url));
       } else {
-        setImages(attraction?.image_url ? [attraction.image_url] : []);
+          setImages(attraction?.primary_image ? [attraction.primary_image] : []);
       }
       setActiveImage(0);
     } catch {
-      setImages(attraction?.image_url ? [attraction.image_url] : []);
+      setImages(attraction?.primary_image ? [attraction.primary_image] : []);
     }
   };
 
@@ -786,7 +786,7 @@ const PopularCard: React.FC<{ item: Attraction; onPress: (item: Attraction) => v
   const { convertPrice } = useApp();
   return (
   <TouchableOpacity style={styles.popularCard} onPress={() => onPress(item)} activeOpacity={0.9}>
-    <Image source={{ uri: item.image_url }} style={styles.popularImage} />
+    <Image source={{ uri: item.primary_image }} style={styles.popularImage} />
     <View style={styles.popularOverlay}>
       <Text style={styles.popularName}>{item.name}</Text>
       <Text style={styles.popularPrice}>from {convertPrice(item.price_from)}</Text>
@@ -801,7 +801,7 @@ const NearestCard: React.FC<{ item: Attraction; onPress: (item: Attraction) => v
   const { convertPrice } = useApp();
   return (
   <TouchableOpacity style={styles.nearestCard} onPress={() => onPress(item)} activeOpacity={0.9}>
-    <Image source={{ uri: item.image_url }} style={styles.nearestImage} />
+    <Image source={{ uri: item.primary_image }} style={styles.nearestImage} />
     <View style={styles.nearestOverlay}>
       <Text style={styles.nearestName} numberOfLines={2}>{item.name}</Text>
       <Text style={styles.nearestPrice}>From {convertPrice(item.price_from)}</Text>
